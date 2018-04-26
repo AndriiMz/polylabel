@@ -5,7 +5,8 @@
   "main": "polylabel.js",
   "scripts": {
     "pretest": "eslint *.js test/*.js",
-    "test": "tape test/test.js"
+    "test": "tape test/test.js",
+    "rectangle": "tape test/rectangle.js"
   },
   "keywords": [],
   "author": "Andrii Moroz",

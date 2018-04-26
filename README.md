@@ -45,20 +45,6 @@ var p = polylabel(polygon, 1.0);
 [TypeScript type definitions](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/concaveman)
 are available via `npm install --save @types/polylabel`.
 
-### C++ Usage
-
-It is recommended to install polylabel via [mason](https://github.com/mapbox/mason). You will also need to install its dependencies: [geometry.hpp](https://github.com/mapbox/geometry.hpp) and [variant](https://github.com/mapbox/variant).
-
-```C++
-#include <mapbox/polylabel.hpp>
-
-int main() {
-    mapbox::geometry::polygon<double> polygon = readPolygon(); // Get polygon data from somewhere.
-    mapbox::geometry::point<double> p = mapbox::polylabel(polygon, 1.0);
-    return 0;
-}
-```
-
 ### Command Line Usage
 
 An external utility can be found at https://github.com/andrewharvey/geojson-polygon-labels
