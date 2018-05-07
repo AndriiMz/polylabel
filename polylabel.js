@@ -4,8 +4,59 @@ var Queue = require('tinyqueue');
 
 module.exports = polylabel;
 module.exports.default = polylabel;
+//Description:
+//rectangleSize(width, height, rotateIterationStep)
+function polylabel(polygon, rectangleSize, precision, debug) {
 
-function polylabel(polygon, precision, debug) {
+    var cell = gridAlgorithm(polygon, precision, debug);
+    if(rectangleSize === undefined) {
+        if (cell instanceof Cell) {
+            return [cell.x, cell.y];
+        }
+        return cell;
+    } else {
+        var isValid = false, rectBoundDst, shiftCounts, rect;
+        if(cell instanceof Cell) {
+            rect = getRectangleBounds(cell.x, cell.y, rectangleSize);
+        } else {
+            rect = getRectangleBounds(cell[0], cell[1], rectangleSize);
+        }
+
+        var ck = 1;
+        while(
+            !isValid
+            &&
+            !(Math.abs(rect[5]) > 4)
+        ) {
+
+            var res;
+            rect = getRotatedRectangleBounds(rect, rectangleSize[2]);
+            console.log(rect);
+            res = verifyBound(rect, polygon);
+            isValid = res[0];
+            rectBoundDst = res[1];
+            res = shiftRectangle(rect, rectBoundDst);
+            shiftCounts = res[0];
+            rect = res[1];
+            break;
+            if(shiftCounts < 0) {
+                break;
+            }
+            // ck++;
+            // if(ck > 4) {
+            //     return;
+            // }
+            // console.log(rect);
+            // console.log( verifyBound(rect, polygon) );
+            // console.log(Math.abs(rect[5]) > 4 );
+        }
+        return rect;
+    }
+}
+
+
+
+function gridAlgorithm(polygon, precision, debug) {
     precision = precision || 1.0;
 
     // find the bounding box of the outer ring
@@ -71,7 +122,115 @@ function polylabel(polygon, precision, debug) {
         console.log('best distance: ' + bestCell.d);
     }
 
-    return [bestCell.x, bestCell.y];
+    return bestCell;
+}
+
+function getRectangleBounds(x, y, size) {
+    var dx = size[0] / 2,
+        dy = size[1] / 2;
+
+    return [
+        [x-dx, y - dy],
+        [x+dx, y - dy],
+        [x+dx, y + dy],
+        [x-dx, y + dy],
+        [x, y]
+    ];
+}
+
+function getRotatedRectangleBounds(bounds, angle) {
+    var sinT = Math.sin(angle),
+        cosT = Math.cos(angle),
+        x, y, dx, dy, cx, cy,
+        rotatedBounds = [],
+        center = bounds[4],
+        i = 0;
+
+    for (; i < 4; i++) {
+        x = bounds[i][0];
+        y = bounds[i][1];
+        cx = x - center[0];
+        cy = y - center[1];
+        dx = cx * cosT - cy * sinT + center[0];
+        dy = cx * sinT + cy * cosT + center[1];
+        rotatedBounds[i] = [dx, dy];
+    }
+    //angle as last element of array
+    if(bounds.length > 5) {
+        rotatedBounds[5] = bounds[5] + angle;
+    } else {
+        rotatedBounds[5] = angle;
+    }
+
+    rotatedBounds[4] = center;
+    return rotatedBounds;
+}
+
+function verifyBound(bounds, polygon) {
+    var isValid = true, i = 0, boundsDist = [];
+    for(; i < 4; i++) {
+        var dist = pointToPolygonDist(bounds[i][0], bounds[i][1], polygon);
+        boundsDist[i] = dist;
+        if(dist < 0) {
+            isValid = false;
+        }
+    }
+    return [isValid, boundsDist];
+}
+
+function shiftRectangle(bounds, boundsDist) {
+    var i = 0, shiftDist, shiftIndex = [], shiftCount = 0, dx, dy;
+    for(; i < 4; i++) {
+        if(boundsDist[i] < 0) {
+            shiftIndex.push(i);
+            shiftDist = boundsDist[i];
+            shiftCount++;
+        }
+    }
+
+    if(shiftCount === 1) {
+        shiftIndex = shiftIndex[0];
+        dx = (shiftIndex === 0 || shiftIndex === 3) ? shiftDist : -shiftDist;
+        dy = (shiftIndex === 2 || shiftIndex === 3) ? shiftDist : -shiftDist;
+        i = 0;
+        for(; i < 5; i++) {
+            bounds[i][0] += dx;
+            bounds[i][1] += dy;
+        }
+    }
+    if(shiftCount === 2) {
+        shiftDist = Math.max(boundsDist[shiftIndex[0]], boundsDist[shiftIndex[1]]);
+        switch (shiftIndex[0] | shiftIndex[1]) {
+            case 1 | 2:
+            case 2 | 1:
+                for(; i < 5; i++) {
+                    bounds[i][1] -= shiftDist;
+                }
+                break;
+            case 4 | 3:
+            case 3 | 4:
+                for(; i < 5; i++) {
+                    bounds[i][1] += shiftDist;
+                }
+                break;
+            case 3 | 2:
+            case 2 | 3:
+                for(; i < 5; i++) {
+                    bounds[i][0] -= shiftDist;
+                }
+                break;
+            case 4 | 1:
+            case 1 | 4:
+                for(; i < 5; i++) {
+                    bounds[i][0] += shiftDist;
+                }
+                break;
+            default:
+                shiftCount = -1;
+                break;
+        }
+    }
+    return [shiftCount, bounds];
 }
 
 function compareMax(a, b) {
@@ -86,18 +245,22 @@ function Cell(x, y, h, polygon) {
     this.max = this.d + this.h * Math.SQRT2; // max distance to polygon within a cell
 }
 
+
+
 // signed distance from point to polygon outline (negative if point is outside)
 function pointToPolygonDist(x, y, polygon) {
     var inside = false;
     var minDistSq = Infinity;
 
     for (var k = 0; k < polygon.length; k++) {
+        //Iterate for in-out side polygons
         var ring = polygon[k];
 
         for (var i = 0, len = ring.length, j = len - 1; i < len; j = i++) {
             var a = ring[i];
             var b = ring[j];
 
+            // Check if point is inside fragment
             if ((a[1] > y !== b[1] > y) &&
                 (x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0])) inside = !inside;
 
@@ -116,6 +279,9 @@ function getCentroidCell(polygon) {
     var points = polygon[0];
 
     for (var i = 0, len = points.length, j = len - 1; i < len; j = i++) {
+        //example set:
+        //   iteration 1: i = 0; j = 10
+        //   iteration 2: i = 1; j = 0
         var a = points[i];
         var b = points[j];
         var f = a[0] * b[1] - b[0] * a[1];
